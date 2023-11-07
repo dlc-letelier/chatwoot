@@ -10,22 +10,18 @@ import 'videojs-record/dist/css/videojs.record.css';
 
 import videojs from 'video.js';
 
+import inboxMixin from '../../../../shared/mixins/inboxMixin';
 import alertMixin from '../../../../shared/mixins/alertMixin';
 
 import Recorder from 'opus-recorder';
-
-// Workers to record Audio .ogg and .wav
 import encoderWorker from 'opus-recorder/dist/encoderWorker.min';
-import waveWorker from 'opus-recorder/dist/waveWorker.min';
 
 import WaveSurfer from 'wavesurfer.js';
 import MicrophonePlugin from 'wavesurfer.js/dist/plugin/wavesurfer.microphone.js';
-
 import 'videojs-wavesurfer/dist/videojs.wavesurfer.js';
+
 import 'videojs-record/dist/videojs.record.js';
-
-import OpusRecorderEngine from 'videojs-record/dist/plugins/videojs.record.opus-recorder.js';
-
+import 'videojs-record/dist/plugins/videojs.record.opus-recorder.js';
 import { format, addSeconds } from 'date-fns';
 import { AUDIO_FORMATS } from 'shared/constants/messages';
 
@@ -33,19 +29,14 @@ WaveSurfer.microphone = MicrophonePlugin;
 
 export default {
   name: 'WootAudioRecorder',
-  mixins: [alertMixin],
-  props: {
-    audioRecordFormat: {
-      type: String,
-      default: AUDIO_FORMATS.WAV,
-    },
-  },
+  mixins: [inboxMixin, alertMixin],
   data() {
     return {
       player: false,
       recordingDateStarted: new Date(0),
       initialTimeDuration: '00:00',
       recorderOptions: {
+        debug: true,
         controls: true,
         bigPlayButton: false,
         fluid: false,
@@ -80,21 +71,25 @@ export default {
           record: {
             audio: true,
             video: false,
-            maxLength: 900,
-            timeSlice: 1000,
-            maxFileSize: 15 * 1024 * 1024,
-            displayMilliseconds: false,
-            audioChannels: 1,
-            audioSampleRate: 48000,
-            audioBitRate: 128,
-            audioEngine: 'opus-recorder',
-            ...(this.audioRecordFormat === AUDIO_FORMATS.WAV && {
-              audioMimeType: 'audio/wav',
-              audioWorkerURL: waveWorker,
+            ...(this.audioRecordFormat === AUDIO_FORMATS.WEBM && {
+              monitorGain: 0,
+              recordingGain: 1,
+              numberOfChannels: 1,
+              encoderSampleRate: 16000,
+              originalSampleRateOverride: 16000,
+              streamPages: true,
+              maxFramesPerPage: 1,
+              encoderFrameSize: 1,
+              encoderPath: 'opus-recorder/dist/waveWorker.min.js',
             }),
             ...(this.audioRecordFormat === AUDIO_FORMATS.OGG && {
-              audioMimeType: 'audio/ogg',
+              displayMilliseconds: false,
+              maxLength: 300,
+              audioEngine: 'opus-recorder',
               audioWorkerURL: encoderWorker,
+              audioChannels: 1,
+              audioSampleRate: 48000,
+              audioBitRate: 128,
             }),
           },
         },
@@ -104,6 +99,12 @@ export default {
   computed: {
     isRecording() {
       return this.player && this.player.record().isRecording();
+    },
+    audioRecordFormat() {
+      if (this.isAWebWidgetInbox) {
+        return AUDIO_FORMATS.WEBM;
+      }
+      return AUDIO_FORMATS.OGG;
     },
   },
   mounted() {
@@ -132,11 +133,6 @@ export default {
   },
   methods: {
     deviceReady() {
-      if (this.player.record().engine instanceof OpusRecorderEngine) {
-        if (this.audioRecordFormat === AUDIO_FORMATS.WAV) {
-          this.player.record().engine.audioType = 'audio/wav';
-        }
-      }
       this.player.record().start();
     },
     startRecord() {
@@ -225,8 +221,8 @@ export default {
 
 <style lang="scss">
 .audio-wave-wrapper {
-  min-height: 5rem;
-  height: 5rem;
+  min-height: 8rem;
+  height: 8rem;
 }
 .video-js .vjs-control-bar {
   background-color: transparent;
